@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微博知乎B站小红书关键词屏蔽器
 // @namespace    http://tampermonkey.net/
-// @version      2.6.0
+// @version      2.6.2
 // @description  屏蔽微博、知乎、小红书、B站含关键词的内容，全平台跨域实时同步、支持查询与直接编辑修改
 // @author       KasenRi
 // @match        https://www.zhihu.com/
@@ -188,8 +188,6 @@
             .kb-list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f0f0f0; gap: 6px; }
             .kb-list-item:hover { background: #f5f5f5; }
             .kb-keyword { flex: 1; font-size: 13px; color: #262626; word-break: break-all; }
-
-            /* 操作按钮组样式 */
             .kb-action-group { display: flex; gap: 4px; }
             .kb-edit-btn { padding: 3px 6px; background: #faad14; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
             .kb-edit-btn:hover { background: #ffc53d; }
@@ -197,7 +195,6 @@
             .kb-delete-btn:hover { background: #ff7875; }
             .kb-save-btn { padding: 3px 6px; background: #52c41a; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
             .kb-save-btn:hover { background: #73d13d; }
-
             .kb-confirm-group { display: flex; gap: 6px; }
             .kb-confirm-btn { padding: 3px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
             .kb-confirm-delete { background: #ff4d4f; color: white; }
@@ -246,7 +243,7 @@
                     <input type="text" id="kb-search-input" class="kb-input" placeholder="🔍 查找已有屏蔽词..." style="background: #fafafa;" />
                 </div>
                 <div class="kb-switch-row">
-                    <span class="kb-switch-label" title="开启后，长屏蔽词会被拆解为每2个字组合，只要匹配到任意2个字就屏蔽">⚡ 极细拆词模式（2字组合即屏蔽）</span>
+                    <span class="kb-switch-label" title="开启后，长词会自动提取前2个字进行模糊匹配">⚡ 2字核心拆词模式</span>
                     <label class="kb-switch">
                         <input type="checkbox" id="kb-deep-switch" ${isDeepChecked}>
                         <span class="kb-slider"></span>
@@ -301,7 +298,6 @@
         }
     }
 
-    // 切换为输入框修改模式
     function showEditMode(listItem, index) {
         const currentWord = BLOCK_KEYWORDS[index];
         listItem.innerHTML = `
@@ -360,7 +356,7 @@
         if (words.length > 0) {
             BLOCK_KEYWORDS.unshift(...words);
             saveKeywords(BLOCK_KEYWORDS);
-
+            
             const searchInput = document.getElementById('kb-search-input');
             if (searchInput) searchInput.value = '';
             renderKeywordList();
@@ -481,7 +477,6 @@
             if (e.key === 'Enter') addBtn.click();
         });
 
-        // 列表按钮代理点击事件（修改、删除、保存、取消）
         list.addEventListener('click', (e) => {
             const index = parseInt(e.target.dataset.index, 10);
             if (isNaN(index)) return;
@@ -509,7 +504,6 @@
             }
         });
 
-        // 修改模式下支持 Enter 键回车保存
         list.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && e.target.classList.contains('kb-edit-input')) {
                 const listItem = e.target.closest('.kb-list-item');
@@ -564,13 +558,13 @@
 
         const isMatched = BLOCK_KEYWORDS.some(k => {
             if (!k) return false;
+            // 1. 完全包含匹配
             if (title.includes(k)) return true;
 
+            // 2. 统一取前 2 个字进行模糊匹配（开启开关后生效）
             if (cachedDeepSplit && k.length >= 2) {
-                for (let i = 0; i < k.length - 1; i++) {
-                    const sub2 = k.substring(i, i + 2);
-                    if (title.includes(sub2)) return true;
-                }
+                const prefix2 = k.substring(0, 2);
+                if (title.includes(prefix2)) return true;
             }
             return false;
         });
@@ -645,7 +639,7 @@
             const site = getCurrentSite();
             const config = siteConfigs[site];
             if (!config) return;
-
+            
             let shouldProcess = false;
             for (let i = 0; i < mutations.length; i++) {
                 const mutation = mutations[i];
